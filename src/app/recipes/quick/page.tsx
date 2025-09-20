@@ -1,22 +1,24 @@
 import RecipeList from '@/components/recipe/RecipeList';
-import { sampleRecipes } from '@/lib/sample-data';
+import { getQuickRecipes } from '@/lib/sample-data';
 
-export default function RecipesPage() {
+export default function QuickRecipesPage() {
+  const quickRecipes = getQuickRecipes();
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Recipe Collection
+          Quick Recipes
         </h1>
         <p className="text-gray-600">
-          Discover delicious recipes with AI-powered cooking assistance
+          Delicious meals ready in 30 minutes or less
         </p>
       </div>
       
       <RecipeList 
-        recipes={sampleRecipes} 
-        title="All Recipes"
-        showFilters={true}
+        recipes={quickRecipes} 
+        title="Quick & Easy"
+        showFilters={false}
       />
     </div>
   );

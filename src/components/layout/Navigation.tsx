@@ -30,6 +30,12 @@ export default function Navigation() {
             >
               Recipes
             </Link>
+            <Link 
+              href="/gesture-test" 
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Gesture Test
+            </Link>
             <button
               onClick={() => setIsCookingMode(!isCookingMode)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
