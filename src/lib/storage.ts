@@ -114,3 +114,117 @@ export const cookingSessionStorage = {
     sessionStorage.remove(STORAGE_KEYS.COOKING_SESSION);
   }
 };
+
+// Recipe history storage
+export const recipeHistoryStorage = {
+  get: (): string[] => {
+    return storage.get<string[]>(STORAGE_KEYS.RECIPE_HISTORY) || [];
+  },
+
+  add: (recipeId: string): void => {
+    const history = recipeHistoryStorage.get();
+    const updatedHistory = [recipeId, ...history.filter(id => id !== recipeId)].slice(0, 20); // Keep last 20
+    storage.set(STORAGE_KEYS.RECIPE_HISTORY, updatedHistory);
+  },
+
+  remove: (recipeId: string): void => {
+    const history = recipeHistoryStorage.get();
+    const updatedHistory = history.filter(id => id !== recipeId);
+    storage.set(STORAGE_KEYS.RECIPE_HISTORY, updatedHistory);
+  },
+
+  clear: (): void => {
+    storage.remove(STORAGE_KEYS.RECIPE_HISTORY);
+  }
+};
+
+// Generic storage with versioning
+export const versionedStorage = {
+  get: <T>(key: string, currentVersion: string): T | null => {
+    const item = storage.get<{ data: T; version: string; timestamp: string }>(key);
+    
+    if (!item) return null;
+    
+    // Check version compatibility
+    if (item.version !== currentVersion) {
+      console.warn(`Storage version mismatch for ${key}. Expected: ${currentVersion}, Found: ${item.version}`);
+      storage.remove(key);
+      return null;
+    }
+    
+    return item.data;
+  },
+
+  set: <T>(key: string, data: T, version: string): void => {
+    const item = {
+      data,
+      version,
+      timestamp: new Date().toISOString()
+    };
+    storage.set(key, item);
+  }
+};
+
+// Storage utilities
+export const storageUtils = {
+  // Get storage size in bytes
+  getStorageSize: (): number => {
+    if (!isClient) return 0;
+    
+    let total = 0;
+    for (const key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        total += localStorage[key].length + key.length;
+      }
+    }
+    return total;
+  },
+
+  // Check if storage is available
+  isStorageAvailable: (): boolean => {
+    if (!isClient) return false;
+    
+    try {
+      const test = '__storage_test__';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Clear all VeCook data
+  clearAllVeCookData: (): void => {
+    if (!isClient) return;
+    
+    Object.values(STORAGE_KEYS).forEach(key => {
+      storage.remove(key);
+    });
+  },
+
+  // Export all VeCook data
+  exportData: (): Record<string, unknown> => {
+    if (!isClient) return {};
+    
+    const data: Record<string, unknown> = {};
+    Object.values(STORAGE_KEYS).forEach(key => {
+      const value = storage.get(key);
+      if (value !== null) {
+        data[key] = value;
+      }
+    });
+    return data;
+  },
+
+  // Import VeCook data
+  importData: (data: Record<string, unknown>): void => {
+    if (!isClient) return;
+    
+    Object.entries(data).forEach(([key, value]) => {
+      if (Object.values(STORAGE_KEYS).includes(key as typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS])) {
+        storage.set(key, value);
+      }
+    });
+  }
+};

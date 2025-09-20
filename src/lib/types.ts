@@ -87,3 +87,48 @@ export interface GestureConfig {
   cooldownMs: number;
   requiredConfidence: number;
 }
+
+// Additional utility types
+export interface RecipeFilter {
+  difficulty?: 'easy' | 'medium' | 'hard';
+  maxCookingTime?: number;
+  tags?: string[];
+  dietaryRestrictions?: string[];
+  servings?: number;
+}
+
+export interface CookingTimer {
+  id: string;
+  stepId: string;
+  duration: number; // seconds
+  startTime: Date;
+  isActive: boolean;
+  label: string;
+}
+
+export interface PortionAdjustment {
+  originalServings: number;
+  targetServings: number;
+  multiplier: number;
+}
+
+// Error types
+export interface VeCookError {
+  code: string;
+  message: string;
+  context?: Record<string, unknown>;
+}
+
+// API Response types
+export interface APIResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: VeCookError;
+}
+
+// Storage types
+export interface StorageItem<T> {
+  data: T;
+  timestamp: Date;
+  version: string;
+}
