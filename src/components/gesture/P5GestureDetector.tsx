@@ -20,6 +20,10 @@ export default function P5GestureDetector({
   const containerRef = useRef<HTMLDivElement>(null);
   const p5InstanceRef = useRef<any>(null);
 
+  // Store the callback in a ref to prevent re-renders
+  const onGestureDetectedRef = useRef(onGestureDetected);
+  onGestureDetectedRef.current = onGestureDetected;
+
   useEffect(() => {
     if (!isActive || !containerRef.current) return;
 
@@ -88,53 +92,73 @@ export default function P5GestureDetector({
           p.pop();
 
           if (hand) {
-            let fingers = ["thumb", "index_finger", "middle_finger", "ring_finger", "pinky"];
-            let stretchedFingers = fingers.filter((finger: string) => isFingerStretched(hand, finger));
-
-            // When index, middle, ring finger is open
+            // Priority-based gesture detection - only detect ONE gesture at a time
+            // Priority order: 1. Hand raise, 2. Point left/right
+            
+            let gestureDetected = false;
+            
+            // 1. Check for hand raise (highest priority)
             if (isHandOpen(hand)) {
               let fingers = ["index_finger", "middle_finger", "ring_finger"];
+              let handIsUp = false;
               for (let i = 0; i < fingers.length; i++) {
                 if (isFingerPointingUp(hand, fingers[i])) {
-                  handTimer++;
-                  console.log("Hand is OPEN and UP✋");
-                  if (handTimer / 3 == timeToExecute) {
-                    console.log("API Called: handTimer", handTimer);
-                    onGestureDetected('hand_raise');
-                    handTimer = 0;
-                  }
+                  handIsUp = true;
+                  break;
                 }
               }
-            } else {
+              
+              if (handIsUp) {
+                handTimer++;
+                console.log("Hand is OPEN and UP✋");
+                if (handTimer == timeToExecute) {
+                  console.log("API Called: handTimer", handTimer);
+                  onGestureDetectedRef.current('hand_raise');
+                  handTimer = 0;
+                }
+                gestureDetected = true;
+              }
+            }
+            // 2. Check for pointing gestures (lower priority) - only if hand raise not detected
+            else if (isFingerStretched(hand, "index_finger") && !isHandOpen(hand)) {
+              // Make sure it's ONLY index finger pointing, not an open hand
+              let otherFingersDown = !isFingerStretched(hand, "middle_finger") && 
+                                   !isFingerStretched(hand, "ring_finger") && 
+                                   !isFingerStretched(hand, "pinky");
+              
+              if (otherFingersDown) {
+                let direction = isFingerPointingLeftRight(hand, "index_finger");
+                if (direction === "right") {
+                  console.log("Index finger is pointing RIGHT 👉");
+                  leftIndexFingerTimer = 0;
+                  rightIndexFingerTimer++;
+                  if (rightIndexFingerTimer == timeToExecute) {
+                    console.log("API Called: rightIndexFingerTimer", rightIndexFingerTimer);
+                    onGestureDetectedRef.current('point_right');
+                    rightIndexFingerTimer = 0;
+                  }
+                  gestureDetected = true;
+                } else if (direction === "left") {
+                  console.log("Index finger is pointing LEFT 👈");
+                  rightIndexFingerTimer = 0;
+                  leftIndexFingerTimer++;
+                  if (leftIndexFingerTimer == timeToExecute) {
+                    console.log("API Called: leftIndexFingerTimer", leftIndexFingerTimer);
+                    onGestureDetectedRef.current('point_left');
+                    leftIndexFingerTimer = 0;
+                  }
+                  gestureDetected = true;
+                }
+              }
+            }
+            
+            // Reset timers for gestures that are not currently being detected
+            if (!gestureDetected || !(isHandOpen(hand) && isFingerPointingUp(hand, "index_finger"))) {
               handTimer = 0;
             }
-
-            // Check for index finger pointing
-            if (isFingerStretched(hand, "index_finger")) {
-              let direction = isFingerPointingLeftRight(hand, "index_finger");
-              if (direction === "right") {
-                console.log("Index finger is pointing RIGHT 👉");
-                leftIndexFingerTimer = 0;
-                rightIndexFingerTimer++;
-                if (rightIndexFingerTimer == timeToExecute) {
-                  console.log("API Called: rightIndexFingerTimer", rightIndexFingerTimer);
-                  onGestureDetected('point_right');
-                  rightIndexFingerTimer = 0;
-                }
-              } else if (direction === "left") {
-                console.log("Index finger is pointing LEFT 👈");
-                rightIndexFingerTimer = 0;
-                leftIndexFingerTimer++;
-                if (leftIndexFingerTimer == timeToExecute) {
-                  console.log("API Called: leftIndexFingerTimer", leftIndexFingerTimer);
-                  onGestureDetected('point_left');
-                  leftIndexFingerTimer = 0;
-                }
-              }
-            } else {
+            if (!gestureDetected || !(isFingerStretched(hand, "index_finger") && !isHandOpen(hand))) {
               rightIndexFingerTimer = 0;
               leftIndexFingerTimer = 0;
-              handTimer = 0;
             }
 
             // Draw keypoints (exactly like yours)
@@ -151,10 +175,36 @@ export default function P5GestureDetector({
             handTimer = 0;
           }
 
-          // Progress bar (exactly like yours)
+          // Progress bar with gesture indication
           p.strokeWeight(0);
-          p.fill("orange");
-          p.rect(0, p.height - 50, p.map((handTimer / 3) + rightIndexFingerTimer + leftIndexFingerTimer, 0, timeToExecute, 0, p.width), 50);
+          let currentProgress = 0;
+          let progressColor = "orange";
+          let gestureText = "";
+          
+          if (handTimer > 0) {
+            currentProgress = handTimer;
+            progressColor = "green";
+            gestureText = "✋ Hand Raise";
+          } else if (rightIndexFingerTimer > 0) {
+            currentProgress = rightIndexFingerTimer;
+            progressColor = "red";
+            gestureText = "👉 Point Right";
+          } else if (leftIndexFingerTimer > 0) {
+            currentProgress = leftIndexFingerTimer;
+            progressColor = "purple";
+            gestureText = "👈 Point Left";
+          }
+          
+          p.fill(progressColor);
+          p.rect(0, p.height - 50, p.map(currentProgress, 0, timeToExecute, 0, p.width), 50);
+          
+          // Display current gesture text
+          if (gestureText) {
+            p.fill("white");
+            p.textAlign(p.CENTER, p.CENTER);
+            p.textSize(16);
+            p.text(gestureText, p.width / 2, p.height - 25);
+          }
         };
 
         // gotHands function (exactly like yours)
@@ -199,6 +249,8 @@ export default function P5GestureDetector({
           let fingers = ["index_finger", "middle_finger", "ring_finger"];
           return fingers.every((finger: string) => isFingerStretched(hand, finger));
         }
+
+
       };
 
       // Create P5 instance
@@ -214,7 +266,7 @@ export default function P5GestureDetector({
         p5InstanceRef.current = null;
       }
     };
-  }, [isActive, onGestureDetected]);
+  }, [isActive]); // Removed onGestureDetected dependency to prevent re-renders
 
   return (
     <div className={`p5-gesture-detector ${className}`}>
